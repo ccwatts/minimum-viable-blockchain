@@ -5,19 +5,21 @@ from ecdsa import SigningKey
 from Crypto.Hash import SHA256
 
 
-
 def sha256(string):
     return SHA256.new(string).hexdigest()
+
 
 def verify_hash(in_hash):
     numerical_value = int(in_hash, 16)
     return numerical_value < Node.HASH_BOUND
+
 
 class Node:
     # there is probably a better way to do this.
     HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     COINBASE_AMOUNT = 25
     nodes = dict()
+
     def __init__(self):
         # placeholders
         self.sk = SigningKey.generate()

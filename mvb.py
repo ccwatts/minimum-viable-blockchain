@@ -3,6 +3,7 @@ from node import *
 
 NUM_NODES = 2
 
+
 def initialize():
     for i in xrange(NUM_NODES):
         n = Node()
@@ -33,9 +34,9 @@ if __name__ == "__main__":
 
     sent = sender.make_transaction(inputs, outputs, cbtx)
     sender.mine(sent)
-    #print sender == recipient
-    #print sent
-    #sender.add_tx(sent)
+    # print sender == recipient
+    # print sent
+    # sender.add_tx(sent)
     print sender.validate(sent)
     print sender.verify(sent)
     exit()
