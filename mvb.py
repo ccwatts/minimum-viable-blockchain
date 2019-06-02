@@ -31,9 +31,6 @@ def make_coinbase():
     return data
 
 
-
-
-
 if __name__ == "__main__":
     '''
     n = Node()
