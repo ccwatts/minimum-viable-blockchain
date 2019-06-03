@@ -1,4 +1,5 @@
 # aaaaa
+from transactions import *
 from node import *
 
 NUM_NODES = 2
@@ -16,26 +17,27 @@ def initialize():
 def make_genesis():
     data = dict()
     chosen_node = random.choice(Identity.all.keys())
-    data["inputs"] = list()
-    data["outputs"] = [(chosen_node, Node.GENESIS_AMOUNT)]
-    data["prev"] = None
-    data["sigstrings"] = list()
-    data["id"] = sha256(json.dumps(data))
+    data["INPUT"] = list()
+    data["OUTPUT"] = [(chosen_node, Node.GENESIS_AMOUNT)]
+    data["PREV"] = None
+    data["SIGNATURE"] = list()
+    data["NUMBER"] = sha256(json.dumps(data))
+    Transactions.all[data["NUMBER"]] = data
     return data
 
 
 if __name__ == "__main__":
     for i in range(NUM_IDENS):
-        Identity()
+        iden = Identity()
     cbtx = initialize()
-    sender = Identity.all[cbtx["outputs"][0][0]]
+    sender = Identity.all[cbtx["OUTPUT"][0][0]]
     recipient = random.choice(Identity.all.values())
     verifier = random.choice(Node.all.values())
 
-    inputs = [(cbtx["id"], 0)]
+    inputs = [(cbtx["NUMBER"], 0)]
     outputs = [(Node.GENESIS_AMOUNT, sender.pkh)]
 
-    sent = verifier.make_transaction(inputs, outputs, cbtx)
+    sent = iden.make_transaction(inputs, outputs, cbtx)
     verifier.mine(sent)
     # print sender == recipient
     # print sent
