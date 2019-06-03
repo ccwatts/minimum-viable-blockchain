@@ -17,7 +17,7 @@ def verify_hash(in_hash):
 class Node:
     # there is probably a better way to do this.
     HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-    COINBASE_AMOUNT = 25
+    GENESIS_AMOUNT = 25
     nodes = dict()
 
     def __init__(self):
@@ -29,10 +29,10 @@ class Node:
         self.tail = None
         Node.nodes[self.pkh] = self
 
-    def accept_coinbase(self, coinbase_tx):
+    def accept_genesis(self, genesis_tx):
         self.chain = dict()
-        self.chain[coinbase_tx["id"]] = coinbase_tx
-        self.tail = [coinbase_tx["id"]]
+        self.chain[genesis_tx["id"]] = genesis_tx
+        self.tail = [genesis_tx["id"]]
 
     def make_transaction(self, inputs, output, prev):  # , nonce, powork):
         data = OrderedDict()
@@ -155,7 +155,7 @@ class Node:
             amount_in += input_tx["outputs"][offset][1]
 
         amount_out = 0
-        for pk, amt in tx["outputs"]:
+        for amt, pk in tx["outputs"]:
             amount_out += amt
 
         return amount_in == amount_out

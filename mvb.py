@@ -7,17 +7,17 @@ NUM_NODES = 2
 def initialize():
     for i in xrange(NUM_NODES):
         n = Node()
-    cbtx = make_coinbase()
+    cbtx = make_genesis()
     for _, v in Node.nodes.items():
-        v.accept_coinbase(cbtx)
+        v.accept_genesis(cbtx)
     return cbtx
 
 
-def make_coinbase():
+def make_genesis():
     data = dict()
     chosen_node = random.choice(Node.nodes.keys())
     data["inputs"] = list()
-    data["outputs"] = [(chosen_node, Node.COINBASE_AMOUNT)]
+    data["outputs"] = [(chosen_node, Node.GENESIS_AMOUNT)]
     data["prev"] = None
     data["sigstrings"] = list()
     data["id"] = sha256(json.dumps(data))
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     recipient = random.choice(Node.nodes.values())
     
     inputs = [(cbtx["id"], 0)]
-    outputs = [(sender.pkh, Node.COINBASE_AMOUNT)]
+    outputs = [(Node.GENESIS_AMOUNT, sender.pkh)]
 
     sent = sender.make_transaction(inputs, outputs, cbtx)
     sender.mine(sent)
