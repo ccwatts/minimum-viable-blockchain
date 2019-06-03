@@ -14,20 +14,42 @@ def verify_hash(in_hash):
     return numerical_value < Node.HASH_BOUND
 
 
-class Node:
-    # there is probably a better way to do this.
-    HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-    GENESIS_AMOUNT = 25
-    nodes = dict()
-
+class Identity:
+    all = dict()
     def __init__(self):
         # placeholders
         self.sk = SigningKey.generate()
         self.pk = self.sk.get_verifying_key()
-        self.pkh = sha256(self.pk.to_string())
+        self.pkh = self.pk.to_string().encode("hex")
+        Identity.all[self.pkh] = self
+
+    def sign(self, m):
+        return self.sk.sign(m).encode("hex")
+
+    def verify(self, m, sig):
+        decoded = sig.decode("hex")
+        try:
+
+            return True
+        except AssertionError:
+            return False
+
+
+class Node:
+    # there is probably a better way to do this.
+    HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    GENESIS_AMOUNT = 25
+    all = dict()
+
+    # THIS LIKELY HAS TO CHANGE.
+    def __init__(self):
+        # placeholders
+        self.sk = SigningKey.generate()
+        self.pk = self.sk.get_verifying_key()
+        self.pkh = self.pk.to_string().encode("hex") #sha256(self.pk.to_string())
         self.chain = None
         self.tail = None
-        Node.nodes[self.pkh] = self
+        Node.all[self.pkh] = self
 
     def accept_genesis(self, genesis_tx):
         self.chain = dict()
@@ -57,7 +79,7 @@ class Node:
         for pair in data["inputs"]:
             content = self.get_sig_content(pair, output)
             output_source = self.get_output(pair)
-            signer = Node.nodes[output_source[0]]
+            signer = Identity.all[output_source[0]]
             signature = signer.sign(content)
             sigstrings.append(signature)
 
@@ -73,9 +95,6 @@ class Node:
         offset = input_pair[1]
         return self.chain[tx_id]["outputs"][offset]
 
-    def sign(self, m):
-        return self.sk.sign(m).encode("hex")
-
     def verify_sigs(self, tx):
         if len(tx["inputs"]) != len(tx["sigs"]):
             return False
@@ -83,7 +102,7 @@ class Node:
             pair = tx["inputs"][i]
             content = self.get_sig_content(pair, tx["outputs"])
             output_source = self.get_output(pair)
-            signer = Node.nodes[output_source[0]]
+            signer = Identity.all[output_source[0]]
             decoded_sig = tx["sigs"][i].decode("hex")
             try:
                 signer.pk.verify(decoded_sig, content)

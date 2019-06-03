@@ -2,20 +2,20 @@
 from node import *
 
 NUM_NODES = 2
-
+NUM_IDENS = 5
 
 def initialize():
     for i in xrange(NUM_NODES):
-        n = Node()
+        Node()
     cbtx = make_genesis()
-    for _, v in Node.nodes.items():
+    for _, v in Node.all.items():
         v.accept_genesis(cbtx)
     return cbtx
 
 
 def make_genesis():
     data = dict()
-    chosen_node = random.choice(Node.nodes.keys())
+    chosen_node = random.choice(Identity.all.keys())
     data["inputs"] = list()
     data["outputs"] = [(chosen_node, Node.GENESIS_AMOUNT)]
     data["prev"] = None
@@ -25,20 +25,23 @@ def make_genesis():
 
 
 if __name__ == "__main__":
+    for i in range(NUM_IDENS):
+        Identity()
     cbtx = initialize()
-    sender = Node.nodes[cbtx["outputs"][0][0]]
-    recipient = random.choice(Node.nodes.values())
-    
+    sender = Identity.all[cbtx["outputs"][0][0]]
+    recipient = random.choice(Identity.all.values())
+    verifier = random.choice(Node.all.values())
+
     inputs = [(cbtx["id"], 0)]
     outputs = [(Node.GENESIS_AMOUNT, sender.pkh)]
 
-    sent = sender.make_transaction(inputs, outputs, cbtx)
-    sender.mine(sent)
+    sent = verifier.make_transaction(inputs, outputs, cbtx)
+    verifier.mine(sent)
     # print sender == recipient
     # print sent
     # sender.add_tx(sent)
-    print sender.validate(sent)
-    print sender.verify(sent)
+    print verifier.validate(sent)
+    print verifier.verify(sent)
     exit()
 
 
