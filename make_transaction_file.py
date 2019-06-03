@@ -4,8 +4,6 @@ import random
 from collections import OrderedDict
 
 
-
-
 class Transactions:
     def __init__(self):
         # get all the identities we need

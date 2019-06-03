@@ -1,7 +1,7 @@
 import json
 import random
 from collections import OrderedDict
-from ecdsa import SigningKey
+from ecdsa import SigningKey, VerifyingKey
 from Crypto.Hash import SHA256
 
 
@@ -102,10 +102,12 @@ class Node:
             pair = tx["inputs"][i]
             content = self.get_sig_content(pair, tx["outputs"])
             output_source = self.get_output(pair)
-            signer = Identity.all[output_source[0]]
+            pk = VerifyingKey.from_string(output_source[0].decode("hex"))
+            # signer = Identity.all[output_source[0]]
             decoded_sig = tx["sigs"][i].decode("hex")
             try:
-                signer.pk.verify(decoded_sig, content)
+                pk.verify(decoded_sig, content)
+                # signer.pk.verify(decoded_sig, content)
             except AssertionError:
                 return False
         return True
