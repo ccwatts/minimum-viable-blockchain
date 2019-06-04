@@ -1,4 +1,3 @@
-# aaaaa
 import node
 import transactions
 import random
