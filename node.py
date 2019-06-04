@@ -6,13 +6,36 @@ from ecdsa import SigningKey, VerifyingKey
 from Crypto.Hash import SHA256
 
 
+def xor_strings(plaintext, key):
+    # key length adjustments
+    fit_key = key
+    while len(fit_key) < len(plaintext):
+        fit_key += key
+    fit_key = fit_key[:len(plaintext)]
+    # perform xor
+    xored = [ord(pc) ^ ord(kc) for pc, kc in zip(plaintext, fit_key)]
+    return "".join(chr(xc) for xc in xored)
+
+
 def sha256(string):
     return SHA256.new(string).hexdigest()
 
 
+def scrypt(string, N=10):
+    V = [None for i in range(N)]
+    x = sha256(string)
+    for i in range(N):
+        V[i] = x
+        x = sha256(x)
+    for i in range(N):
+        j = int(x, 16) % N
+        x = sha256(xor_strings(x, V[j]))
+    return x
+
+
 def verify_hash(in_hash):
     numerical_value = int(in_hash, 16)
-    return numerical_value < Node.HASH_BOUND
+    return numerical_value <= Node.HASH_BOUND
 
 
 def sign(sk, m):
@@ -49,7 +72,8 @@ class Identity:
 class Node:
     # there is probably a better way to do this.
     #HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-    HASH_BOUND = 0x0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    #HASH_BOUND = 0x0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    HASH_BOUND = 0x000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     GENESIS_AMOUNT = 25
     all = dict()
 
@@ -92,12 +116,13 @@ class Node:
                 return False
         return True
 
-    def mine(self, tx):
+    def mine(self, txd):
+        tx = OrderedDict(txd)
+        tx["PREV"] = self.tail[0]
         nonce, hashed = Node.proof_of_work(tx)
         tx["nonce"] = nonce
         tx["pow"] = hashed
         # TODO TEMP.
-        tx["PREV"] = self.tail[0]
         # need to do announcement stuff here
         return tx
 
@@ -107,11 +132,11 @@ class Node:
         # secure randomness is probably unnecessary.
         nonce = random.SystemRandom().randint(1, 100000000000)
         total = serialized + str(nonce)
-        hashed = sha256(total)
+        hashed = scrypt(total)
         while not verify_hash(hashed):
             nonce = random.SystemRandom().randint(1, 100000000000)
             total = serialized + str(nonce)
-            hashed = sha256(total)
+            hashed = scrypt(total)
         return nonce, hashed
 
     @staticmethod
@@ -120,10 +145,10 @@ class Node:
             without_pow = OrderedDict(tx)
             without_pow.pop("pow")
             without_pow.pop("nonce")
-            without_pow.pop("PREV")
+            #without_pow.pop("PREV")
             serialized = json.dumps(without_pow)
             total = serialized + str(tx["nonce"])
-            rehash = sha256(total)
+            rehash = scrypt(total)
             return rehash == tx["pow"]
         else:
             return False
@@ -187,9 +212,9 @@ class Node:
         # is the input verified?
         return self.validate(tx) and self.verify_pow(tx)
 
-    def verify_and_add(self, tx):
+    def verify_and_add(self, tx, utp):
         assert self.verify(tx)
-        self.add_tx(tx)
+        self.add_tx(tx, utp)
 
     def chain_length(self, tail):
         return len(self.get_chain_line(tail))
@@ -219,7 +244,9 @@ class Node:
         except KeyError:
             return line
 
-    def add_tx(self, tx):
+    # this may need to change to support further searches into the chain in case we have multiple forks that are
+    # more than 1 deep each -- which is outrageously unlikely, but a possibility.
+    def add_tx(self, tx, utp):
         tail = None
         for i in range(len(self.tail)):
             if self.tail[i] == tx["PREV"]:
@@ -241,6 +268,8 @@ class Node:
                 altline = self.get_chain_line(old_tail)
                 outsides = [x for x in altline if x not in mainline]
                 for x in outsides:
+                    if x not in utp:
+                        utp.append(x)
                     self.chain.pop(x, None)
         self.tail = new_tail
         return
@@ -252,12 +281,12 @@ class Node:
             if self.validate(pick):
                 if self.input_in_chain(pick):
                     print "mining"
-                    self.mine(pick)
-                    self.add_tx(pick)
+                    mined = self.mine(pick)
+                    self.add_tx(mined, utp)
                     #temp...
                     for n in Node.all.values():
                         if n != self:
-                            n.verify_and_add(pick)
+                            n.verify_and_add(mined, utp)
                     utp.remove(pick)
                 elif not self.input_exists(pick, utp):
                     utp.remove(pick)
@@ -290,11 +319,11 @@ class Node:
                 if self.input_in_chain(pick):
                     print "mining"
                     self.mine(pick)
-                    self.add_tx(pick)
+                    self.add_tx(pick, utp)
                     #temp...
                     for n in Node.all.values():
                         if n != self:
-                            n.verify_and_add(pick)
+                            n.verify_and_add(pick, utp)
                     utp.remove(pick)
                 elif not self.input_exists(pick, utp):
                     utp.remove(pick)
@@ -310,5 +339,5 @@ class Node:
                 #     print "All remaining transactions are invalid. Aborting."
                 #     break
             self.print_chain()
-        except:
+        except AssertionError:
             print "failed to process transaction"
