@@ -46,12 +46,18 @@ def node_thread(bnode, utp, cond):
         print utp
         bnode.loop(utp)
 
-def test_node(bnode, utp):
+def test_node(bnode, utp, cond):
     lg.debug('Starting node thread')
     print bnode
     print utp
-    while (len(utp) > 0):
-        bnode.single_tx(utp)
+    with cond:
+        while (len(utp) > 0):
+            pick = bnode.single_tx(utp)
+            cond.wait()
+            if pick:
+                bnode.verify_single(utp, pick)
+            cond.notifyAll()
+        
 
 if __name__ == "__main__":
     lg.basicConfig(level=lg.DEBUG, format='%(asctime)s (%(threadName)-2s) %(message)s',)
@@ -69,14 +75,17 @@ if __name__ == "__main__":
     # current build illustrates inconsistencies in chain construction
     # need to share chain modifications after each completion
 
+    utpt = thr.Thread(name='ut', target=utp_monitor, args=(utp, condition,))
+
     for i in xrange(10):
         temp = node.Node()
         temp.accept_genesis(genesis)
         tname = "t%s" % (i)
-        threads[i] = thr.Thread(name=tname, target=test_node, args=(temp, utp,))
+        threads[i] = thr.Thread(name=tname, target=test_node, args=(temp, utp, condition,))
 
     for i in xrange(10):
         threads[i].start()
+    utpt.start()
 
     '''
     utpt = thr.Thread(name='ut', target=utp_monitor, args=(utp, condition,))

@@ -185,7 +185,9 @@ class Node:
 
     def verify(self, tx):
         # is the input verified?
-        return self.validate(tx) and self.verify_pow(tx)
+        assert self.validate(tx)
+        assert self.verify_pow(tx)
+        return True
 
     def verify_and_add(self, tx):
         assert self.verify(tx)
@@ -292,10 +294,7 @@ class Node:
                     self.mine(pick)
                     self.add_tx(pick)
                     #temp...
-                    for n in Node.all.values():
-                        if n != self:
-                            n.verify_and_add(pick)
-                    utp.remove(pick)
+                    return pick
                 elif not self.input_exists(pick, utp):
                     utp.remove(pick)
             else:
@@ -310,5 +309,12 @@ class Node:
                 #     print "All remaining transactions are invalid. Aborting."
                 #     break
             self.print_chain()
+            return None
         except:
             print "failed to process transaction"
+
+    def verify_single(self, utp, pick):
+        for n in Node.all.values():
+            if n != self:
+                n.verify_and_add(pick)
+        utp.remove(pick)
