@@ -75,6 +75,7 @@ def node_thread(bnode, utp, cond):
         print utp
         bnode.loop(utp)
 
+
 if __name__ == "__main__":
     lg.basicConfig(level=lg.DEBUG, format='%(asctime)s (%(threadName)-2s) %(message)s',)
     condition = thr.Condition()
@@ -96,6 +97,7 @@ if __name__ == "__main__":
     n = node.Node()
     n.accept_genesis(genesis)
     n.loop(utp)
+
 
     for vn in node.Node.all.values():
         vn.print_chain()
