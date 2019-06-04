@@ -9,6 +9,7 @@ import time
 NUM_NODES = 2
 NUM_IDENS = 5
 
+
 def initialize():
     for i in xrange(NUM_NODES):
         node.Node()
