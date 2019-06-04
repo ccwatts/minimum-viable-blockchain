@@ -219,7 +219,6 @@ class Node:
         except KeyError:
             return line
 
-
     def add_tx(self, tx):
         tail = None
         for i in range(len(self.tail)):
@@ -283,3 +282,33 @@ class Node:
         # kinda assuming there's only one tail here...
         print self.chain_length(self.tail[0])
 
+    def single_tx(self, utp):
+        try:
+            pick = random.choice(utp)
+
+            if self.validate(pick):
+                if self.input_in_chain(pick):
+                    print "mining"
+                    self.mine(pick)
+                    self.add_tx(pick)
+                    #temp...
+                    for n in Node.all.values():
+                        if n != self:
+                            n.verify_and_add(pick)
+                    utp.remove(pick)
+                elif not self.input_exists(pick, utp):
+                    utp.remove(pick)
+            else:
+                print "Discarding invalid tx"
+                utp.remove(pick)
+                # allDone = True
+                # for tx in utp:
+                #     if self.validate(tx):
+                #         allDone = False
+                #         break
+                # if allDone:
+                #     print "All remaining transactions are invalid. Aborting."
+                #     break
+            self.print_chain()
+        except:
+            print "failed to process transaction"

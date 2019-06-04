@@ -31,35 +31,6 @@ def make_genesis():
     return data
 
 # https://pymotw.com/2/threading/ used as thread reference
-'''
-def consumer(cond):
-    """wait for the condition and use the resource"""
-    lg.debug('Starting consumer thread')
-    t = thr.currentThread()
-    with cond:
-        cond.wait()
-        lg.debug('Resource is available to consumer')
-
-def producer(cond):
-    """set up the resource to be used by the consumer"""
-    lg.debug('Starting producer thread')
-    with cond:
-        lg.debug('Making resource available')
-        cond.notifyAll()
-
-# main        
-    condition = thr.Condition()
-    c1 = thr.Thread(name='c1', target=consumer, args=(condition,))
-    c2 = thr.Thread(name='c2', target=consumer, args=(condition,))
-    p = thr.Thread(name='p', target=producer, args=(condition,))
-
-    c1.start()
-    time.sleep(2)
-    c2.start()
-    time.sleep(2)
-    p.start()
-    '''
-
 def utp_monitor(utp, cond):
     lg.debug('Starting utp thread')
     with cond:
@@ -75,6 +46,12 @@ def node_thread(bnode, utp, cond):
         print utp
         bnode.loop(utp)
 
+def test_node(bnode, utp):
+    lg.debug('Starting node thread')
+    print bnode
+    print utp
+    while (len(utp) > 0):
+        bnode.single_tx(utp)
 
 if __name__ == "__main__":
     lg.basicConfig(level=lg.DEBUG, format='%(asctime)s (%(threadName)-2s) %(message)s',)
@@ -85,7 +62,23 @@ if __name__ == "__main__":
     # genesis, utp = transactions.TransactionPool.generate_io_chain()
 
     threads = [None] * 10
+    
+    # issues arose in running concurrent threads with try/except
+    # managed to run through, but created inconsistent chains
+    # no changes to the add function were forthcoming for solving issue
+    # current build illustrates inconsistencies in chain construction
+    # need to share chain modifications after each completion
 
+    for i in xrange(10):
+        temp = node.Node()
+        temp.accept_genesis(genesis)
+        tname = "t%s" % (i)
+        threads[i] = thr.Thread(name=tname, target=test_node, args=(temp, utp,))
+
+    for i in xrange(10):
+        threads[i].start()
+
+    '''
     utpt = thr.Thread(name='ut', target=utp_monitor, args=(utp, condition,))
 
     for i in xrange(10):
@@ -94,21 +87,10 @@ if __name__ == "__main__":
         tname = "t%s" % (i)
         threads[i] = thr.Thread(name=tname, target=node_thread, args=(temp, utp, condition,))
 
-    '''
-    n = node.Node()
-    n.accept_genesis(genesis)
-    n.loop(utp)
-
-
-    for vn in node.Node.all.values():
-        vn.print_chain()
-        print
-    exit()
-    '''
-
     for i in xrange(10):
         threads[i].start()
     utpt.start()
+    '''
 
     '''
     for i in range(NUM_IDENS):
