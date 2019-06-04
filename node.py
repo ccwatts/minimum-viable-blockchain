@@ -192,17 +192,33 @@ class Node:
         self.add_tx(tx)
 
     def chain_length(self, tail):
+        return len(self.get_chain_line(tail))
+        #if type(tail) is OrderedDict:
+        #    curr = tail
+        #else:
+        #    curr = self.chain[tail]
+        #length = 1
+        #try:
+        #    while curr is not None:
+        #        length += 1
+        #        curr = self.chain[curr["PREV"]]
+        #except KeyError:
+        #    return length
+
+    def get_chain_line(self, tail):
         if type(tail) is OrderedDict:
             curr = tail
         else:
             curr = self.chain[tail]
-        length = 1
+        line = list()
+        #line.append(curr["NUMBER"])
         try:
             while curr is not None:
-                length += 1
+                line.append(curr["NUMBER"])
                 curr = self.chain[curr["PREV"]]
         except KeyError:
-            return length
+            return line
+
 
     def add_tx(self, tx):
         tail = None
@@ -217,10 +233,16 @@ class Node:
 
         length = self.chain_length(tx)
         new_tail = list()
-        new_tail.append(length)
+        new_tail.append(tail["NUMBER"])
+        mainline = self.get_chain_line(tail["NUMBER"])
         for old_tail in self.tail:
             if self.chain_length(old_tail) >= length:
                 new_tail.append(old_tail)
+            else:
+                altline = self.get_chain_line(old_tail)
+                outsides = [x for x in altline if x not in mainline]
+                for x in outsides:
+                    self.chain.pop(x, None)
         self.tail = new_tail
         return
 
@@ -252,10 +274,12 @@ class Node:
                 #     print "All remaining transactions are invalid. Aborting."
                 #     break
 
-        #self.print_chain()
+        self.print_chain()
 
     def print_chain(self):
         print "=== CHAIN ==="
         for k, v in self.chain.items():
             print k
-        print len(self.chain)
+        # kinda assuming there's only one tail here...
+        print self.chain_length(self.tail[0])
+
