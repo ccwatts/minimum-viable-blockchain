@@ -71,6 +71,7 @@ def node_thread(bnode, utp, cond):
         print bnode
         cond.wait()
         lg.debug('Resource is available to consumer')
+        print utp
         bnode.loop(utp)
 
 
