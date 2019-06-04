@@ -29,15 +29,20 @@ def make_genesis():
 
 
 if __name__ == "__main__":
-    transactions.TransactionPool()
+    transactions.TransactionPool.initialize()
     genesis, utp = transactions.TransactionPool.generate_io_chain()
 
     for i in xrange(5):
-        node.Node()
+        temp = node.Node()
+        temp.accept_genesis(genesis)
 
     n = node.Node()
     n.accept_genesis(genesis)
     n.loop(utp)
+
+    for vn in node.Node.all.values():
+        vn.print_chain()
+        print
     exit()
     '''
     for i in range(NUM_IDENS):

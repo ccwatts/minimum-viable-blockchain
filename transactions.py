@@ -11,14 +11,20 @@ def sha256(string):
 
 class TransactionPool:
     all = dict()
+
     def __init__(self):
         # get all the identities we need
         while len(node.Identity.all) < 5:
             node.Identity()
 
     @staticmethod
+    def initialize():
+        while len(node.Identity.all) < 5:
+            node.Identity()
+
+    @staticmethod
     def make_genesis():
-        recipient = node.Identity.all.values()[0] #random.choice(node.Identity.all.items())
+        recipient = node.Identity.all.values()[0]  # random.choice(node.Identity.all.items())
         output = [(recipient.pkh, node.Node.GENESIS_AMOUNT)]
         return TransactionPool.make_transaction(list(), output), recipient
 
@@ -48,14 +54,43 @@ class TransactionPool:
 
         transactions = list()
         start, recipient = TransactionPool.make_genesis()
-        #transactions.append(start)
+        # transactions.append(start)
         # inputs:  tx_id, offset
         # outputs: pkh, amount
+
         i1 = [(start["NUMBER"], 0)]
         o1 = [[p1, 20], [p2, 5]]
         t1 = TransactionPool.make_transaction(i1, o1)
-        #t1["OUTPUT"][0][1] = 25
         transactions.append(t1)
+
+        i2 = [(t1["NUMBER"], 0)]
+        o2 = [(p0, 20)]
+        t2 = TransactionPool.make_transaction(i2, o2)
+        transactions.append(t2)
+
+        i3 = [(t1["NUMBER"], 1)]
+        o3 = [(p0, 5)]
+        t3 = TransactionPool.make_transaction(i3, o3)
+        transactions.append(t3)
+
+        # merge
+        i4 = [(t2["NUMBER"], 0), (t3["NUMBER"], 0)]
+        o4 = [(p0, 25)]
+        t4 = TransactionPool.make_transaction(i4, o4)
+        transactions.append(t4)
+
+        # join
+        i5 = [(t4["NUMBER"], 0)]
+        o5 = [(p0, 5), (p1, 5), (p2, 5), (p3, 5), (p4, 5)]
+        t5 = TransactionPool.make_transaction(i5, o5)
+        transactions.append(t5)
+
+
+        # invalid
+        i_inv = [(t1["NUMBER"], 1)]
+        o_inv = [(p1, 5)]
+        t_inv = TransactionPool.make_transaction(i_inv, o_inv)
+        transactions.append(t_inv)
 
         with open("transactions.json", "w") as f:
             f.write(json.dumps(transactions))
@@ -99,3 +134,4 @@ class TransactionPool:
         TransactionPool.all[identifier] = data
         print json.dumps(data)
         return data
+

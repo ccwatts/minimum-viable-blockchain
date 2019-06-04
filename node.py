@@ -59,7 +59,7 @@ class Node:
         self.sk = SigningKey.generate()
         self.pk = self.sk.get_verifying_key()
         self.pkh = self.pk.to_string().encode("hex") #sha256(self.pk.to_string())
-        self.chain = None
+        self.chain = dict()
         self.tail = list()
         Node.all[self.pkh] = self
 
@@ -170,6 +170,10 @@ class Node:
         # is the input verified?
         return self.validate(tx) and self.verify_pow(tx)
 
+    def verify_and_add(self, tx):
+        assert self.verify(tx)
+        self.add_tx(tx)
+
     def chain_length(self, tail):
         if type(tail) is OrderedDict:
             curr = tail
@@ -213,7 +217,7 @@ class Node:
                 #temp...
                 for n in Node.all.values():
                     if n != self:
-                        assert n.verify(pick)
+                        n.verify_and_add(pick)
                 utp.remove(pick)
             else:
                 allDone = True
@@ -225,5 +229,8 @@ class Node:
                     print "All remaining transactions are invalid. Aborting."
                     break
 
+        #self.print_chain()
+
+    def print_chain(self):
         for k, v in self.chain.items():
             print k
