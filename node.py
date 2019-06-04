@@ -1,6 +1,6 @@
-from transactions import *
 import json
 import random
+import transactions
 from collections import OrderedDict
 from ecdsa import SigningKey, VerifyingKey
 from Crypto.Hash import SHA256
@@ -13,22 +13,6 @@ def sha256(string):
 def verify_hash(in_hash):
     numerical_value = int(in_hash, 16)
     return numerical_value < Node.HASH_BOUND
-
-
-def get_output(input_pair):
-    tx_id = input_pair[0]
-    offset = input_pair[1]
-    return Transactions.all[tx_id]["OUTPUT"][offset]
-
-
-def get_sig_content(input_pair, output):
-#    out_from_last = get_output(input_pair)  # self.chain[pkh][offset]
-#    return str(json.dumps(input_pair) + json.dumps(out_from_last) + json.dumps(output))
-    return str(json.dumps(input_pair) + json.dumps(output))
-
-
-def get_id_content(inputs, outputs, sigs):
-    return str(json.dumps(inputs) + json.dumps(outputs) + json.dumps(sigs))
 
 
 def sign(sk, m):
@@ -59,41 +43,13 @@ class Identity:
     def verify(self, m, sig):
         return verify(self.pkh, m, sig)
 
-    def make_transaction(self, inputs, outputs, prev):
-        data = OrderedDict()
-        # List of (ID hash, Offset) pairs
-        data["INPUT"] = inputs
-        # List of (ID hash, Amount) pairs
-        data["OUTPUT"] = outputs
-        # A singular ID to the previous "block"/transaction
-        # Wrap in an if statement so we can feed either the tx itself or its id
-        if type(prev) is dict:
-            data["PREV"] = prev["NUMBER"]
-        else:
-            data["PREV"] = prev
-        # what we do ourselves.
-        # make the signatures once the inputs/outputs are known
-        sigstrings = list()
-        for pair in data["INPUT"]:
-            content = get_sig_content(pair, outputs)
-            output_source = get_output(pair)
-            signer = Identity.all[output_source[0]]
-            signature = signer.sign(content)
-            sigstrings.append(signature)
 
-        data["SIGNATURE"] = sigstrings
-
-        # hash everything to get the identifier
-        id_target = get_id_content(inputs, outputs, sigstrings)
-        identifier = sha256(json.dumps(id_target))
-        data["NUMBER"] = identifier
-        Transactions.all[identifier] = data
-        return data
 
 
 class Node:
     # there is probably a better way to do this.
-    HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    #HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    HASH_BOUND = 0x0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     GENESIS_AMOUNT = 25
     all = dict()
 
@@ -104,7 +60,7 @@ class Node:
         self.pk = self.sk.get_verifying_key()
         self.pkh = self.pk.to_string().encode("hex") #sha256(self.pk.to_string())
         self.chain = None
-        self.tail = None
+        self.tail = list()
         Node.all[self.pkh] = self
 
     def accept_genesis(self, genesis_tx):
@@ -113,27 +69,35 @@ class Node:
         self.tail = [genesis_tx["NUMBER"]]
 
     def verify_sigs(self, tx):
-        if len(tx["INPUT"]) != len(tx["SIGNATURE"]):
+        if len(tx["INPUT"]) != len(tx["SIGNATURE"][1]):
             return False
+
+        try:
+            assert sha256(tx["TYPE"]) == tx["SIGNATURE"][0]
+        except AssertionError:
+            return False
+
         for i in range(len(tx["INPUT"])):
             pair = tx["INPUT"][i]
-            content = get_sig_content(pair, tx["OUTPUT"])
-            output_source = get_output(pair)
+            content = transactions.TransactionPool.get_sig_content(pair, tx["OUTPUT"])
+            output_source = transactions.TransactionPool.get_output(pair)
             pk = VerifyingKey.from_string(output_source[0].decode("hex"))
             # signer = Identity.all[output_source[0]]
-            decoded_sig = tx["SIGNATURE"][i].decode("hex")
+            decoded_sig = tx["SIGNATURE"][1][i].decode("hex")
             try:
                 pk.verify(decoded_sig, content)
                 # signer.pk.verify(decoded_sig, content)
-            except AssertionError:
+            except Exception as e:
+                print(e)
                 return False
         return True
 
-    @staticmethod
-    def mine(tx):
+    def mine(self, tx):
         nonce, hashed = Node.proof_of_work(tx)
         tx["nonce"] = nonce
         tx["pow"] = hashed
+        # TODO TEMP.
+        tx["PREV"] = self.tail[0]
         # need to do announcement stuff here
         return tx
 
@@ -156,6 +120,7 @@ class Node:
             without_pow = OrderedDict(tx)
             without_pow.pop("pow")
             without_pow.pop("nonce")
+            without_pow.pop("PREV")
             serialized = json.dumps(without_pow)
             total = serialized + str(tx["nonce"])
             rehash = sha256(total)
@@ -181,7 +146,7 @@ class Node:
     def io_matches(self, tx):
         amount_in = 0
         for pk, offset in tx["INPUT"]:
-            input_tx = self.chain[pk]
+            input_tx = transactions.TransactionPool.all[pk]
             # Transaction
             # -> Outputs [(ID, Amt)s]
             #    -> (ID, Amt)
@@ -189,7 +154,7 @@ class Node:
             amount_in += input_tx["OUTPUT"][offset][1]
 
         amount_out = 0
-        for amt, pk in tx["OUTPUT"]:
+        for pk, amt in tx["OUTPUT"]:
             amount_out += amt
 
         return amount_in == amount_out
@@ -205,13 +170,60 @@ class Node:
         # is the input verified?
         return self.validate(tx) and self.verify_pow(tx)
 
+    def chain_length(self, tail):
+        if type(tail) is OrderedDict:
+            curr = tail
+        else:
+            curr = self.chain[tail]
+        length = 1
+        try:
+            while curr is not None:
+                length += 1
+                curr = self.chain[curr["PREV"]]
+        except KeyError:
+            return length
+
     def add_tx(self, tx):
-        continues = False
+        tail = None
         for i in range(len(self.tail)):
             if self.tail[i] == tx["PREV"]:
                 self.tail[i] = tx["NUMBER"]
                 self.chain[tx["NUMBER"]] = tx
-                continues = True
+                tail = tx
                 break
-        if not continues:
+        if tail is None:
             raise Exception("Tried to add transaction that did not continue a current tail of the chain")
+
+        length = self.chain_length(tx)
+        new_tail = list()
+        new_tail.append(length)
+        for old_tail in self.tail:
+            if self.chain_length(old_tail) >= length:
+                new_tail.append(old_tail)
+        self.tail = new_tail
+        return
+
+    def loop(self, utp):
+        while len(utp) > 0:
+            pick = random.choice(utp)
+            print "Mining."
+            if self.validate(pick):
+                self.mine(pick)
+                self.add_tx(pick)
+                #temp...
+                for n in Node.all.values():
+                    if n != self:
+                        assert n.verify(pick)
+                utp.remove(pick)
+            else:
+                allDone = True
+                for tx in utp:
+                    if self.validate(tx):
+                        allDone = False
+                        break
+                if allDone:
+                    print "All remaining transactions are invalid. Aborting."
+                    break
+
+        for k, v in self.chain.items():
+            print k
