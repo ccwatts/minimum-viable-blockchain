@@ -1,4 +1,4 @@
-minimum-viable-blockchain.iml
-transactions.json
-.idea/*
-*.pyc
+./minimum-viable-blockchain.iml
+./transactions.json
+./.idea/*
+./*.pyc
