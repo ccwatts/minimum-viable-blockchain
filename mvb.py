@@ -32,7 +32,7 @@ if __name__ == "__main__":
     transactions.TransactionPool.initialize()
     genesis, utp = transactions.TransactionPool.generate_io_chain()
 
-    for i in xrange(5):
+    for i in xrange(10):
         temp = node.Node()
         temp.accept_genesis(genesis)
 
@@ -43,25 +43,6 @@ if __name__ == "__main__":
     for vn in node.Node.all.values():
         vn.print_chain()
         print
-    exit()
-    '''
-    for i in range(NUM_IDENS):
-        iden = node.Identity()
-    cbtx = initialize()
-    sender = node.Identity.all[cbtx["OUTPUT"][0][0]]
-    recipient = random.choice(node.Identity.all.values())
-    verifier = random.choice(node.Node.all.values())
-    inputs = [(cbtx["NUMBER"], 0)]
-    outputs = [(node.Node.GENESIS_AMOUNT, sender.pkh)]
-    sent = transactions.TransactionPool.make_transaction(inputs, outputs)
-    verifier.mine(sent)
-    # print sender == recipient
-    # print sent
-    # sender.add_tx(sent)
-    print verifier.validate(sent)
-    print verifier.verify(sent)
-    exit()
-    '''
 
 
 

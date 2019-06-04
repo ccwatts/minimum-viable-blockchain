@@ -58,39 +58,78 @@ class TransactionPool:
         # inputs:  tx_id, offset
         # outputs: pkh, amount
 
+        # 1/10
         i1 = [(start["NUMBER"], 0)]
         o1 = [[p1, 20], [p2, 5]]
         t1 = TransactionPool.make_transaction(i1, o1)
         transactions.append(t1)
 
+        # 2/10
         i2 = [(t1["NUMBER"], 0)]
         o2 = [(p0, 20)]
         t2 = TransactionPool.make_transaction(i2, o2)
         transactions.append(t2)
 
+        # 3/10
         i3 = [(t1["NUMBER"], 1)]
         o3 = [(p0, 5)]
         t3 = TransactionPool.make_transaction(i3, o3)
         transactions.append(t3)
 
-        # merge
+        # 4/10, merge
         i4 = [(t2["NUMBER"], 0), (t3["NUMBER"], 0)]
         o4 = [(p0, 25)]
         t4 = TransactionPool.make_transaction(i4, o4)
         transactions.append(t4)
 
-        # join
+        # 5/10
         i5 = [(t4["NUMBER"], 0)]
         o5 = [(p0, 5), (p1, 5), (p2, 5), (p3, 5), (p4, 5)]
         t5 = TransactionPool.make_transaction(i5, o5)
         transactions.append(t5)
 
+        # 6/10, join
+        i6 = [(t5["NUMBER"], 0), (t5["NUMBER"], 1), (t5["NUMBER"], 2)]
+        o6 = [(p4, 15)]
+        t6 = TransactionPool.make_transaction(i6, o6)
+        transactions.append(t6)
 
-        # invalid
-        i_inv = [(t1["NUMBER"], 1)]
-        o_inv = [(p1, 5)]
+        # 7/10, another join
+        i7 = [(t6["NUMBER"], 0), (t5["NUMBER"], 3), (t5["NUMBER"], 4)]
+        o7 = [(p0, 25)]
+        t7 = TransactionPool.make_transaction(i7, o7)
+        transactions.append(t7)
+
+        # at this point, everything's in t7.
+        # 8/10
+        i8 = [(t7["NUMBER"], 0)]
+        o8 = [(p1, 25)]
+        t8 = TransactionPool.make_transaction(i8, o8)
+        transactions.append(t8)
+
+        # 9/10
+        i9 = [(t8["NUMBER"], 0)]
+        o9 = [(p2, 20), (p3, 5)]
+        t9 = TransactionPool.make_transaction(i9, o9)
+        transactions.append(t9)
+
+        # 10/10
+        i10 = [(t9["NUMBER"], 0), (t9["NUMBER"], 1)]
+        o10 = [(p1, 25)]
+        t10 = TransactionPool.make_transaction(i10, o10)
+        transactions.append(t10)
+
+        # 11/10 invalid -- trying to spend more than you have
+        i_inv = [(t9["NUMBER"], 1)]
+        o_inv = [(p3, 100)]
         t_inv = TransactionPool.make_transaction(i_inv, o_inv)
         transactions.append(t_inv)
+
+        # 12/10 malicious -- double spend
+        i_mal = [(t9["NUMBER"], 0)]
+        o_mal = [(p4, 20)]
+        t_mal = TransactionPool.make_transaction(i_mal, o_mal)
+        transactions.append(t_mal)
 
         with open("transactions.json", "w") as f:
             f.write(json.dumps(transactions))

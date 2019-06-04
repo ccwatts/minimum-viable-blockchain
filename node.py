@@ -159,6 +159,23 @@ class Node:
 
         return amount_in == amount_out
 
+    def input_in_chain(self, tx):
+        for id, offset in tx["INPUT"]:
+            if id not in self.chain.keys():
+                return False
+        return True
+
+    def input_exists(self, tx, utp):
+        for id, offset in tx["INPUT"]:
+            found = False
+            for utx in utp:
+                if id == utx["NUMBER"]:
+                    found = True
+                    break
+            if not found and id not in self.chain.keys():
+                return False
+        return True
+
     def validate(self, tx):
         # need to check:
         # does input match output?
@@ -210,27 +227,35 @@ class Node:
     def loop(self, utp):
         while len(utp) > 0:
             pick = random.choice(utp)
-            print "Mining."
+
             if self.validate(pick):
-                self.mine(pick)
-                self.add_tx(pick)
-                #temp...
-                for n in Node.all.values():
-                    if n != self:
-                        n.verify_and_add(pick)
-                utp.remove(pick)
+                if self.input_in_chain(pick):
+                    print "mining"
+                    self.mine(pick)
+                    self.add_tx(pick)
+                    #temp...
+                    for n in Node.all.values():
+                        if n != self:
+                            n.verify_and_add(pick)
+                    utp.remove(pick)
+                elif not self.input_exists(pick, utp):
+                    utp.remove(pick)
             else:
-                allDone = True
-                for tx in utp:
-                    if self.validate(tx):
-                        allDone = False
-                        break
-                if allDone:
-                    print "All remaining transactions are invalid. Aborting."
-                    break
+                print "Discarding invalid tx"
+                utp.remove(pick)
+                # allDone = True
+                # for tx in utp:
+                #     if self.validate(tx):
+                #         allDone = False
+                #         break
+                # if allDone:
+                #     print "All remaining transactions are invalid. Aborting."
+                #     break
 
         #self.print_chain()
 
     def print_chain(self):
+        print "=== CHAIN ==="
         for k, v in self.chain.items():
             print k
+        print len(self.chain)
