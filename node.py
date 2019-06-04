@@ -308,8 +308,8 @@ class Node:
                 # if allDone:
                 #     print "All remaining transactions are invalid. Aborting."
                 #     break
-            self.print_chain()
-            return None
+            #self.print_chain()
+                return None
         except:
             print "failed to process transaction"
 

@@ -53,10 +53,12 @@ def test_node(bnode, utp, cond):
     with cond:
         while (len(utp) > 0):
             pick = bnode.single_tx(utp)
-            cond.wait()
+            print pick
             if pick:
+                cond.wait()
                 bnode.verify_single(utp, pick)
-            cond.notifyAll()
+                print utp
+                cond.notifyAll()      
         
 
 if __name__ == "__main__":
