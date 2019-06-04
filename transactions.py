@@ -43,6 +43,15 @@ class TransactionPool:
         return str(json.dumps(inputs) + json.dumps(outputs) + json.dumps(sigs))
 
     @staticmethod
+    def load_transactions():
+        with open("transactions.json", "r") as f:
+            contents = f.read()
+            transactions = [OrderedDict(d) for d in json.loads(contents)]
+            for t in transactions:
+                TransactionPool.all[t["NUMBER"]] = t
+        return transactions[0], transactions[1:]
+
+    @staticmethod
     def generate_io_chain():
         # need at LEAST 10.
         participants = node.Identity.all.values()
@@ -132,7 +141,8 @@ class TransactionPool:
         transactions.append(t_mal)
 
         with open("transactions.json", "w") as f:
-            f.write(json.dumps(transactions))
+            combine = [start] + transactions
+            f.write(json.dumps(combine))
 
         return start, transactions
 
@@ -171,6 +181,6 @@ class TransactionPool:
         identifier = sha256(json.dumps(id_target))
         data["NUMBER"] = identifier
         TransactionPool.all[identifier] = data
-        print json.dumps(data)
+        # print json.dumps(data)
         return data
 

@@ -80,7 +80,8 @@ if __name__ == "__main__":
     condition = thr.Condition()
 
     transactions.TransactionPool.initialize()
-    genesis, utp = transactions.TransactionPool.generate_io_chain()
+    genesis, utp = transactions.TransactionPool.load_transactions()
+    # genesis, utp = transactions.TransactionPool.generate_io_chain()
 
     threads = [None] * 10
 
