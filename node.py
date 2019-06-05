@@ -274,6 +274,9 @@ class Node(threading.Thread):
         except KeyError:
             return line
 
+    def get_line_keys(self, tail):
+        return [t["NUMBER"] for t in self.get_chain_line(tail)]
+
     # adds a transaction itself, which does the fork resolution inside among other things
     # it won't add it if the resulting chain length would be less than the longest current chain length, and similarly
     # prunes any chains that are shorter after the addition of the new transaction
@@ -428,9 +431,9 @@ class Node(threading.Thread):
 
     def print_chain(self):
         print "=== %d's chain ===" % self.id
-        for k, v in self.chain.items():
+        keys = self.get_line_keys(self.tail[0])
+        for k in keys:
             print k
-        # kinda assuming there's only one tail here...
         print "Length: %d\n" % self.chain_length(self.tail[0])
 
     def run(self):
