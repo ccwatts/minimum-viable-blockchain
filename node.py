@@ -23,7 +23,8 @@ def sha256(string):
     return SHA256.new(string).hexdigest()
 
 
-def scrypt(string, N=10):
+# Extra feature stuff -- an alternative proof of work, using scrypt
+def scrypt(string, N=20):
     V = [None for i in range(N)]
     x = sha256(string)
     for i in range(N):
@@ -53,6 +54,7 @@ def verify(pk_hex, m, sig):
     except AssertionError:
         return False
 
+
 class Identity:
     all = dict()
     def __init__(self):
@@ -71,12 +73,13 @@ class Identity:
 
 class Node(threading.Thread):
     # there is probably a better way to do this.
-    #HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-    #HASH_BOUND = 0x0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    # HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    # HASH_BOUND = 0x0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     HASH_BOUND = 0x00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     GENESIS_AMOUNT = 25
     all = dict()
     verify_target = None
+    verified = list()
     barrier = thread_util.Barrier(1)
     counter = 1
 
@@ -84,8 +87,6 @@ class Node(threading.Thread):
     def __init__(self, genesis, utp):
         # placeholders
         threading.Thread.__init__(self)
-        #self.sk = SigningKey.generate()
-        #self.pk = self.sk.get_verifying_key()
         self.id = Node.counter
         Node.counter += 1
         self.chain = dict()
@@ -232,17 +233,6 @@ class Node(threading.Thread):
 
     def chain_length(self, tail):
         return len(self.get_chain_line(tail))
-        #if type(tail) is OrderedDict:
-        #    curr = tail
-        #else:
-        #    curr = self.chain[tail]
-        #length = 1
-        #try:
-        #    while curr is not None:
-        #        length += 1
-        #        curr = self.chain[curr["PREV"]]
-        #except KeyError:
-        #    return length
 
     def get_chain_line(self, tail):
         if type(tail) is OrderedDict:
@@ -289,8 +279,10 @@ class Node(threading.Thread):
         return
 
     def verify_or_continue(self):
-        if Node.verify_target is not None:
-            self.verify_and_add(Node.verify_target)
+        if len(Node.verified) > 0:
+            for tx in Node.verified:
+                if tx["NUMBER"] not in self.chain.keys():
+                    self.verify_and_add(tx)
             print "%d accepted" % self.id
             Node.barrier.wait()
             return True
@@ -309,14 +301,13 @@ class Node(threading.Thread):
                     mined = self.mine(pick)
                     if mined is None:
                         continue
-                    #self.add_tx(mined)
                     print "%d done mining, alerting rest (%d left in UTP)" % (self.id, len(self.utp))
                     Node.barrier = thread_util.Barrier(len(Node.all))
-                    Node.verify_target = mined
+                    Node.verified.append(mined)
                     # done, remove from pool.
                     self.verify_or_continue()
                     # reset target
-                    Node.verify_target = None
+                    Node.verified.remove(mined)
                     try:
                         self.utp.remove(pick)
                     except ValueError:
