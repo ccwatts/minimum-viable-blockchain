@@ -1,5 +1,6 @@
 import threading
 
+
 class Barrier:
     def __init__(self, n):
         self.n = n
@@ -11,6 +12,7 @@ class Barrier:
         self.mutex.acquire()
         self.count = self.count + 1
         self.mutex.release()
+
         if self.count == self.n:
             self.barrier.release()
         self.barrier.acquire()

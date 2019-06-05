@@ -1,10 +1,12 @@
 import json
 import random
 import transactions
+import thread_util
+import threading
+import time
 from collections import OrderedDict
 from ecdsa import SigningKey, VerifyingKey
 from Crypto.Hash import SHA256
-
 
 def xor_strings(plaintext, key):
     # key length adjustments
@@ -67,25 +69,32 @@ class Identity:
         return verify(self.pkh, m, sig)
 
 
-
-
-class Node:
+class Node(threading.Thread):
     # there is probably a better way to do this.
     #HASH_BOUND = 0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     #HASH_BOUND = 0x0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-    HASH_BOUND = 0x000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    HASH_BOUND = 0x00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     GENESIS_AMOUNT = 25
     all = dict()
+    verify_target = None
+    barrier = thread_util.Barrier(1)
+    counter = 0
 
     # THIS LIKELY HAS TO CHANGE.
-    def __init__(self):
+    def __init__(self, genesis, utp):
         # placeholders
-        self.sk = SigningKey.generate()
-        self.pk = self.sk.get_verifying_key()
-        self.pkh = self.pk.to_string().encode("hex") #sha256(self.pk.to_string())
+        threading.Thread.__init__(self)
+        #self.sk = SigningKey.generate()
+        #self.pk = self.sk.get_verifying_key()
+        self.id = Node.counter
+        Node.counter += 1
         self.chain = dict()
         self.tail = list()
-        Node.all[self.pkh] = self
+
+        self.accept_genesis(genesis)
+        self.utp = utp
+
+        Node.all[self.id] = self
 
     def accept_genesis(self, genesis_tx):
         self.chain = dict()
@@ -95,16 +104,14 @@ class Node:
     def verify_sigs(self, tx):
         if len(tx["INPUT"]) != len(tx["SIGNATURE"][1]):
             return False
-
         try:
             assert sha256(tx["TYPE"]) == tx["SIGNATURE"][0]
         except AssertionError:
             return False
-
         for i in range(len(tx["INPUT"])):
             pair = tx["INPUT"][i]
-            content = transactions.TransactionPool.get_sig_content(pair, tx["OUTPUT"])
-            output_source = transactions.TransactionPool.get_output(pair)
+            content = transactions.TransactionGen.get_sig_content(pair, tx["OUTPUT"])
+            output_source = transactions.TransactionGen.get_output(pair)
             pk = VerifyingKey.from_string(output_source[0].decode("hex"))
             # signer = Identity.all[output_source[0]]
             decoded_sig = tx["SIGNATURE"][1][i].decode("hex")
@@ -119,21 +126,25 @@ class Node:
     def mine(self, txd):
         tx = OrderedDict(txd)
         tx["PREV"] = self.tail[0]
-        nonce, hashed = Node.proof_of_work(tx)
+        nonce, hashed = self.proof_of_work(tx)
+        if nonce is None and hashed is None:
+            return None
         tx["nonce"] = nonce
         tx["pow"] = hashed
         # TODO TEMP.
         # need to do announcement stuff here
         return tx
 
-    @staticmethod
-    def proof_of_work(tx):
+    #@staticmethod
+    def proof_of_work(self, tx):
         serialized = json.dumps(tx)
         # secure randomness is probably unnecessary.
         nonce = random.SystemRandom().randint(1, 100000000000)
         total = serialized + str(nonce)
         hashed = scrypt(total)
         while not verify_hash(hashed):
+            if self.verify_or_continue():
+                return None, None
             nonce = random.SystemRandom().randint(1, 100000000000)
             total = serialized + str(nonce)
             hashed = scrypt(total)
@@ -171,7 +182,7 @@ class Node:
     def io_matches(self, tx):
         amount_in = 0
         for pk, offset in tx["INPUT"]:
-            input_tx = transactions.TransactionPool.all[pk]
+            input_tx = transactions.TransactionGen.all[pk]
             # Transaction
             # -> Outputs [(ID, Amt)s]
             #    -> (ID, Amt)
@@ -190,10 +201,10 @@ class Node:
                 return False
         return True
 
-    def input_exists(self, tx, utp):
+    def input_exists(self, tx):
         for id, offset in tx["INPUT"]:
             found = False
-            for utx in utp:
+            for utx in self.utp:
                 if id == utx["NUMBER"]:
                     found = True
                     break
@@ -214,9 +225,9 @@ class Node:
         assert self.verify_pow(tx)
         return True
 
-    def verify_and_add(self, tx, utp):
+    def verify_and_add(self, tx):
         assert self.verify(tx)
-        self.add_tx(tx, utp)
+        self.add_tx(tx)
 
     def chain_length(self, tail):
         return len(self.get_chain_line(tail))
@@ -248,7 +259,7 @@ class Node:
 
     # this may need to change to support further searches into the chain in case we have multiple forks that are
     # more than 1 deep each -- which is outrageously unlikely, but a possibility.
-    def add_tx(self, tx, utp):
+    def add_tx(self, tx):
         tail = None
         for i in range(len(self.tail)):
             if self.tail[i] == tx["PREV"]:
@@ -270,40 +281,62 @@ class Node:
                 altline = self.get_chain_line(old_tail)
                 outsides = [x for x in altline if x not in mainline]
                 for x in outsides:
-                    if x not in utp:
-                        utp.append(x)
+                    if x not in self.utp:
+                        self.utp.append(x)
                     self.chain.pop(x, None)
         self.tail = new_tail
         return
 
-    def loop(self, utp):
-        while len(utp) > 0:
-            pick = random.choice(utp)
+    def verify_or_continue(self):
+        if Node.verify_target is not None:
+            self.verify_and_add(Node.verify_target)
+            print "%d accepted" % self.id
+            Node.barrier.wait()
+            return True
+        else:
+            Node.barrier.wait()
+            return False
 
+    def loop(self):
+        while len(self.utp) > 0:
+            pick = random.choice(self.utp)
             if self.validate(pick):
                 if self.input_in_chain(pick):
-                    print "mining"
+                    if self.verify_or_continue():
+                        continue
+                    print "%d mining" % self.id
                     mined = self.mine(pick)
-                    self.add_tx(mined, utp)
+                    if mined is None:
+                        continue
+                    #self.add_tx(mined)
+                    print "%d done mining, alerting rest (%d left in UTP)" % (self.id, len(self.utp))
+                    Node.barrier = thread_util.Barrier(len(Node.all))
+                    Node.verify_target = mined
                     #temp...
-                    for n in Node.all.values():
-                        if n != self:
-                            n.verify_and_add(mined, utp)
-                    utp.remove(pick)
-                elif not self.input_exists(pick, utp):
-                    utp.remove(pick)
-            else:
-                print "Discarding invalid tx"
-                utp.remove(pick)
-                # allDone = True
-                # for tx in utp:
-                #     if self.validate(tx):
-                #         allDone = False
-                #         break
-                # if allDone:
-                #     print "All remaining transactions are invalid. Aborting."
-                #     break
+                    #for n in Node.all.values():
+                    #    if n != self:
+                    #        n.verify_and_add(mined)
 
+                    # done, remove from pool.
+                    self.verify_or_continue()
+                    # reset target
+                    Node.verify_target = None
+                    self.utp.remove(pick)
+                elif not self.input_exists(pick):
+                    self.verify_or_continue()
+                    try:
+                        self.utp.remove(pick)
+                    except ValueError:
+                        pass
+            else:
+                print "%d discarding invalid tx" % self.id
+                self.verify_or_continue()
+                try:
+                    self.utp.remove(pick)
+                except ValueError:
+                    pass
+
+        time.sleep(self.id)
         self.print_chain()
 
     def print_chain(self):
@@ -313,42 +346,6 @@ class Node:
         # kinda assuming there's only one tail here...
         print self.chain_length(self.tail[0])
 
-    def single_tx(self, utp):
-        try:
-            pick = random.choice(utp)
-
-            if self.validate(pick):
-                if self.input_in_chain(pick):
-                    print "mining"
-                    self.mine(pick)
-                    self.add_tx(pick, utp)
-                    #temp...
-                    for n in Node.all.values():
-                        if n != self:
-                            n.verify_and_add(pick, utp)
-                    utp.remove(pick)
-                    # temp
-                    return pick
-                elif not self.input_exists(pick, utp):
-                    utp.remove(pick)
-            else:
-                print "Discarding invalid tx"
-                utp.remove(pick)
-                # allDone = True
-                # for tx in utp:
-                #     if self.validate(tx):
-                #         allDone = False
-                #         break
-                # if allDone:
-                #     print "All remaining transactions are invalid. Aborting."
-                #     break
-            #self.print_chain()
-                return None
-        except:
-            print "failed to process transaction"
-
-    def verify_single(self, utp, pick):
-        for n in Node.all.values():
-            if n != self:
-                n.verify_and_add(pick)
-        utp.remove(pick)
+    def run(self):
+        print "Starting loop for %d" % self.id
+        self.loop()

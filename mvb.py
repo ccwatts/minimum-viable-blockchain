@@ -27,67 +27,22 @@ def make_genesis():
     data["PREV"] = None
     data["SIGNATURE"] = list()
     data["NUMBER"] = node.sha256(json.dumps(data))
-    transactions.TransactionPool.all[data["NUMBER"]] = data
+    transactions.TransactionGen.all[data["NUMBER"]] = data
     return data
 
-# https://pymotw.com/2/threading/ used as thread reference
-def utp_monitor(utp, cond):
-    lg.debug('Starting utp thread')
-    with cond:
-        lg.debug('Making resource available')
-        cond.notifyAll()
-
-def node_thread(bnode, utp, cond):
-    lg.debug('Starting node thread')
-    with cond:
-        print bnode
-        cond.wait()
-        lg.debug('Resource is available to consumer')
-        print utp
-        bnode.loop(utp)
-
-def test_node(bnode, utp, cond):
-    lg.debug('Starting node thread')
-    print bnode
-    print utp
-    with cond:
-        while (len(utp) > 0):
-            pick = bnode.single_tx(utp)
-            print pick
-            if pick:
-                cond.wait()
-                bnode.verify_single(utp, pick)
-                print utp
-                cond.notifyAll()      
-        
-
 if __name__ == "__main__":
-    lg.basicConfig(level=lg.DEBUG, format='%(asctime)s (%(threadName)-2s) %(message)s',)
-    condition = thr.Condition()
+    nodes = list()
+    genesis, pool = transactions.TransactionGen.generate_io_chain()
+    for i in range(10):
+        n = node.Node(genesis, pool)
+        nodes.append(n)
 
-    transactions.TransactionPool.initialize()
-    genesis, utp = transactions.TransactionPool.load_transactions()
-    # genesis, utp = transactions.TransactionPool.generate_io_chain()
+    #nodes[0].loop()
+    for n in nodes:
+        n.start()
 
-    threads = [None] * 10
-    
-    # issues arose in running concurrent threads with try/except
-    # managed to run through, but created inconsistent chains
-    # no changes to the add function were forthcoming for solving issue
-    # current build illustrates inconsistencies in chain construction
-    # need to share chain modifications after each completion
-
-    #utpt = thr.Thread(name='ut', target=utp_monitor, args=(utp, condition,))
-
-    for i in xrange(10):
-        temp = node.Node()
-        temp.accept_genesis(genesis)
-        tname = "t%s" % (i)
-        threads[i] = thr.Thread(name=tname, target=test_node, args=(temp, utp, condition,))
-
-    for i in xrange(10):
-        threads[i].start()
-    #utpt.start()
+    #for n in nodes:
+    #    n.print_chain()
 
     '''
     utpt = thr.Thread(name='ut', target=utp_monitor, args=(utp, condition,))
@@ -112,7 +67,7 @@ if __name__ == "__main__":
     verifier = random.choice(node.Node.all.values())
     inputs = [(cbtx["NUMBER"], 0)]
     outputs = [(node.Node.GENESIS_AMOUNT, sender.pkh)]
-    sent = transactions.TransactionPool.make_transaction(inputs, outputs)
+    sent = transactions.TransactionGen.make_transaction(inputs, outputs)
     verifier.mine(sent)
     # print sender == recipient
     # print sent
