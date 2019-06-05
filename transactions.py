@@ -140,7 +140,7 @@ class TransactionGen:
 
         # 12/10 malicious -- double spend
         i_mal = [(t9["NUMBER"], 0)]
-        o_mal = [(p4, 20)]
+        o_mal = [(p4, 21)]
         t_mal = TransactionGen.make_transaction(i_mal, o_mal)
         transactions.append(t_mal)
 

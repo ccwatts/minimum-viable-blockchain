@@ -193,7 +193,7 @@ class Node(threading.Thread):
                     # DO THINGS.
                     # if something in the output matches, ie double spent...
                     for pair in curr["INPUT"]:
-                        if pair in tx["INPUT"]:
+                        if pair in tx["INPUT"] and tx["NUMBER"] != curr["NUMBER"]:
                             return True
                     curr = self.chain[curr["PREV"]]
             except KeyError:
@@ -234,6 +234,10 @@ class Node(threading.Thread):
                 if id == utx["NUMBER"]:
                     found = True
                     break
+            for vtx in self.verified:
+                if id == vtx["NUMBER"]:
+                    found = True
+                    break
             if not found and id not in self.chain.keys():
                 return False
         return True
@@ -249,8 +253,8 @@ class Node(threading.Thread):
     # what it says on the tin
     def verify(self, tx):
         # is the input verified?
-        # assert self.validate(tx)
-        # assert self.verify_pow(tx)
+        assert self.validate(tx)
+        assert self.verify_pow(tx)
         return self.validate(tx) and self.verify_pow(tx)
 
     # what it says on the tin
@@ -409,7 +413,7 @@ class Node(threading.Thread):
                         self.utp.remove(pick)
                     except ValueError:
                         # more race condition stuff, yay.
-                        print "(already discarded)"
+                        print "(already removed mined block from utp)"
                     # wait another 0-2 seconds
                     #time.sleep(random.randint(0, 2))
                 elif not self.input_exists(pick):
@@ -418,10 +422,10 @@ class Node(threading.Thread):
                     try:
                         self.utp.remove(pick)
                     except ValueError:
-                        print "(already discarded)"
+                        print "(already discarded input-less block)"
             else:
                 # it's invalid for other reasons, so dump it
-                print "%d discarding invalid tx" % self.id
+                print "%d discarding invalid tx %s" % (self.id, pick["NUMBER"])
                 self.verify_or_continue()
                 try:
                     self.utp.remove(pick)
