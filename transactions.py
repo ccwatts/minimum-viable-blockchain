@@ -1,5 +1,4 @@
 import json
-import random
 from collections import OrderedDict
 from Crypto.Hash import SHA256
 import node
@@ -9,6 +8,8 @@ def sha256(string):
     return SHA256.new(string).hexdigest()
 
 
+# generator class for the transaction stuff we need
+# is never actually instantiated; it's more of a container for all of the utility functions we need to make tx
 class TransactionGen:
     all = dict()
 
@@ -42,6 +43,7 @@ class TransactionGen:
     def get_id_content(inputs, outputs, sigs):
         return str(json.dumps(inputs) + json.dumps(outputs) + json.dumps(sigs))
 
+    # load from a file
     @staticmethod
     def load_transactions():
         with open("transactions.json", "r") as f:
@@ -51,6 +53,7 @@ class TransactionGen:
                 TransactionGen.all[t["NUMBER"]] = t
         return transactions[0], transactions[1:]
 
+    # programatically make a chain of transactions, both saving the chain to a file and returning it
     @staticmethod
     def generate_io_chain():
         TransactionGen.initialize()
