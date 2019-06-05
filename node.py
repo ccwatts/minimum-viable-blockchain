@@ -78,7 +78,7 @@ class Node(threading.Thread):
     all = dict()
     verify_target = None
     barrier = thread_util.Barrier(1)
-    counter = 0
+    counter = 1
 
     # THIS LIKELY HAS TO CHANGE.
     def __init__(self, genesis, utp):
@@ -139,13 +139,14 @@ class Node(threading.Thread):
     def proof_of_work(self, tx):
         serialized = json.dumps(tx)
         # secure randomness is probably unnecessary.
-        nonce = random.SystemRandom().randint(1, 100000000000)
+        # nonce = random.SystemRandom().randint(1, 100000000000)
+        nonce = 0
         total = serialized + str(nonce)
         hashed = scrypt(total)
         while not verify_hash(hashed):
             if self.verify_or_continue():
                 return None, None
-            nonce = random.SystemRandom().randint(1, 100000000000)
+            nonce = nonce + 1  # random.SystemRandom().randint(1, 100000000000)
             total = serialized + str(nonce)
             hashed = scrypt(total)
         return nonce, hashed
@@ -312,39 +313,37 @@ class Node(threading.Thread):
                     print "%d done mining, alerting rest (%d left in UTP)" % (self.id, len(self.utp))
                     Node.barrier = thread_util.Barrier(len(Node.all))
                     Node.verify_target = mined
-                    #temp...
-                    #for n in Node.all.values():
-                    #    if n != self:
-                    #        n.verify_and_add(mined)
-
                     # done, remove from pool.
                     self.verify_or_continue()
                     # reset target
                     Node.verify_target = None
-                    self.utp.remove(pick)
+                    try:
+                        self.utp.remove(pick)
+                    except ValueError:
+                        print "(already discarded)"
                 elif not self.input_exists(pick):
                     self.verify_or_continue()
                     try:
                         self.utp.remove(pick)
                     except ValueError:
-                        pass
+                        print "(already discarded)"
             else:
                 print "%d discarding invalid tx" % self.id
                 self.verify_or_continue()
                 try:
                     self.utp.remove(pick)
                 except ValueError:
-                    pass
+                    print "(already discarded)"
 
         time.sleep(self.id)
         self.print_chain()
 
     def print_chain(self):
-        print "=== CHAIN ==="
+        print "=== %d's chain ===" % self.id
         for k, v in self.chain.items():
             print k
         # kinda assuming there's only one tail here...
-        print self.chain_length(self.tail[0])
+        print "Length: %d\n" % self.chain_length(self.tail[0])
 
     def run(self):
         print "Starting loop for %d" % self.id
