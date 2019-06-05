@@ -138,7 +138,10 @@ class Node(threading.Thread):
             return None
         tx["NONCE"] = nonce
         tx["POW"] = hashed
-        return tx
+        if txd in self.utp:
+            return tx
+        else:
+            return None
 
     # do the proof of work, calling the scrypt function above
     # used to have nonces randomly chosen, now goes from 0 up indefinitely; not sure which is better.
