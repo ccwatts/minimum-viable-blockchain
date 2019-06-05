@@ -77,7 +77,7 @@ if __name__ == "__main__":
     # current build illustrates inconsistencies in chain construction
     # need to share chain modifications after each completion
 
-    utpt = thr.Thread(name='ut', target=utp_monitor, args=(utp, condition,))
+    #utpt = thr.Thread(name='ut', target=utp_monitor, args=(utp, condition,))
 
     for i in xrange(10):
         temp = node.Node()
@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     for i in xrange(10):
         threads[i].start()
-    utpt.start()
+    #utpt.start()
 
     '''
     utpt = thr.Thread(name='ut', target=utp_monitor, args=(utp, condition,))
