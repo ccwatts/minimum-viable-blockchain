@@ -25,7 +25,7 @@ class TransactionGen:
 
     @staticmethod
     def make_genesis():
-        recipient = node.Identity.all.values()[0]  # random.choice(node.Identity.all.items())
+        recipient = node.Identity.all.values()[0]
         output = [(recipient.pkh, node.Node.GENESIS_AMOUNT)]
         return TransactionGen.make_transaction(list(), output), recipient
 
@@ -37,7 +37,7 @@ class TransactionGen:
 
     @staticmethod
     def get_sig_content(input_pair, output):
-        return str(json.dumps(input_pair) + json.dumps(output))
+        return str(json.dumps(input_pair) + json.dumps(output) + json.dumps(TransactionGen.get_output(input_pair)))
 
     @staticmethod
     def get_id_content(inputs, outputs, sigs):

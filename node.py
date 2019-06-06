@@ -433,8 +433,8 @@ class Node(threading.Thread):
                     print "(already discarded)"
 
         # wait to sync up the printing
-        time.sleep(self.id)
         self.verify_or_continue()
+        time.sleep(self.id * 2)
         self.print_chain()
 
     def print_chain(self):
