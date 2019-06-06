@@ -36,8 +36,8 @@ class TransactionGen:
         return TransactionGen.all[tx_id]["OUTPUT"][offset]
 
     @staticmethod
-    def get_sig_content(input_pair, output):
-        return str(json.dumps(input_pair) + json.dumps(output) + json.dumps(TransactionGen.get_output(input_pair)))
+    def get_sig_content(input_pair, output, type):
+        return str(type + json.dumps(input_pair) + json.dumps(output) + json.dumps(TransactionGen.get_output(input_pair)))
 
     @staticmethod
     def get_id_content(inputs, outputs, sigs):
@@ -162,23 +162,27 @@ class TransactionGen:
         if len(inputs) == 1:
             type = "TRANS"
         else:
-            # assume merge, we'll change over later when we parse input if need be
+            # start with merge, then check if we have more than one signer
             type = "MERGE"
+            for pair in data["INPUT"]:
+                output_source = TransactionGen.get_output(pair)
+                signer = node.Identity.all[output_source[0]]
+                if first_signer is None:
+                    first_signer = signer
+                elif first_signer != signer:
+                    type = "JOIN"
+                    break
 
         for pair in data["INPUT"]:
-            content = TransactionGen.get_sig_content(pair, outputs)
+            content = TransactionGen.get_sig_content(pair, outputs, type)
             output_source = TransactionGen.get_output(pair)
             signer = node.Identity.all[output_source[0]]
-            if first_signer is None:
-                first_signer = signer
-            elif first_signer != signer:
-                type = "JOIN"
             signature = signer.sign(content)
             sigstrings.append(signature)
 
         data["TYPE"] = type
 
-        data["SIGNATURE"] = [sha256(type), sigstrings]
+        data["SIGNATURE"] = sigstrings  # [sha256(type), sigstrings]
 
         # hash everything to get the identifier
         id_target = TransactionGen.get_id_content(inputs, outputs, sigstrings)

@@ -80,7 +80,6 @@ class Node(threading.Thread):
     HASH_BOUND = 0x00FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     GENESIS_AMOUNT = 25
     all = dict()
-    verify_target = None
     verify_queue = list()
     verified = list()
     barrier = thread_util.Barrier(1)
@@ -108,19 +107,19 @@ class Node(threading.Thread):
 
     # verify ALL of the signatures of a transaction
     def verify_sigs(self, tx):
-        if len(tx["INPUT"]) != len(tx["SIGNATURE"][1]):
+        if len(tx["INPUT"]) != len(tx["SIGNATURE"]):
             return False
-        try:
-            assert sha256(tx["TYPE"]) == tx["SIGNATURE"][0]
-        except AssertionError:
-            return False
+        #try:
+        #    assert sha256(tx["TYPE"]) == tx["SIGNATURE"][0]
+        #except AssertionError:
+        #    return False
         for i in range(len(tx["INPUT"])):
             pair = tx["INPUT"][i]
-            content = transactions.TransactionGen.get_sig_content(pair, tx["OUTPUT"])
+            content = transactions.TransactionGen.get_sig_content(pair, tx["OUTPUT"], tx["TYPE"])
             output_source = transactions.TransactionGen.get_output(pair)
             pk = VerifyingKey.from_string(output_source[0].decode("hex"))
             # signer = Identity.all[output_source[0]]
-            decoded_sig = tx["SIGNATURE"][1][i].decode("hex")
+            decoded_sig = tx["SIGNATURE"][i].decode("hex")
             try:
                 pk.verify(decoded_sig, content)
                 # signer.pk.verify(decoded_sig, content)
@@ -187,13 +186,15 @@ class Node(threading.Thread):
     # there may be some weirdness with if the tails of forks are "double spends" of each other, but i'm not sure...
     def has_double_spend(self, tx):
         for tail in self.tail:
+            if tail == tx["NUMBER"]:
+                continue
             try:
                 curr = self.chain[tail]
                 while curr is not None:
                     # DO THINGS.
                     # if something in the output matches, ie double spent...
                     for pair in curr["INPUT"]:
-                        if pair in tx["INPUT"] and tx["NUMBER"] != curr["NUMBER"]:
+                        if pair in tx["INPUT"]:
                             return True
                     curr = self.chain[curr["PREV"]]
             except KeyError:
@@ -415,7 +416,7 @@ class Node(threading.Thread):
                         # more race condition stuff, yay.
                         print "(already removed mined block from utp)"
                     # wait another 0-2 seconds
-                    #time.sleep(random.randint(0, 2))
+                    time.sleep(random.randint(0, 2))
                 elif not self.input_exists(pick):
                     # if the input doesn't exist in any pool, then we bail (after a check)
                     self.verify_or_continue()
