@@ -10,6 +10,7 @@ if __name__ == "__main__":
     except IOError:
         genesis, pool = transactions.TransactionGen.generate_io_chain()
         print "Generated new chain"
+        exit()
     for i in range(10):
         n = node.Node(genesis, pool)
         nodes.append(n)
